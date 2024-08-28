@@ -25,7 +25,7 @@ setup(
     url = "https://github.com/mmhs013/pymannkendall",
     packages = ["pymannkendall"],
     license = __license__,
-    install_requires = ["numpy", "scipy"],
+    install_requires = ["numpy", "scipy", "numba"],
     classifiers = [
 		"Programming Language :: Python :: 2.7",
 		"Programming Language :: Python :: 3.4",
@@ -34,7 +34,7 @@ setup(
         "Programming Language :: Python :: 3.7",
 		"Programming Language :: Python :: 3.8",		
         "Programming Language :: Python :: 3.9",
-        "Programming Language :: Python :: 3.12.3",
+        "Programming Language :: Python :: 3.12",
         "License :: OSI Approved :: MIT License",
 		"Intended Audience :: Science/Research",
 		"Operating System :: OS Independent",
