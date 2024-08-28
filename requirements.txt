@@ -1,4 +1,4 @@
 numpy
-scipy
-pytest
 numba
+pytest
+scipy
