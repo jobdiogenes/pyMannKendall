@@ -10,6 +10,7 @@ Changes by: Job Diógenes Ribeiro Borges
 - All changes are to make faster and add comment #Job
 """
 
+from __future__ import division
 
 #Job: Make NumPy fast  https://superfastpython.com/numpy-blas-threading/
 # turn off threads in numpy (with openblas)
@@ -20,7 +21,6 @@ from multiprocessing.pool import ThreadPool
 #Job: Use Numba to speed up array loop
 from numba import njit
 
-from __future__ import division
 import numpy as np
 from scipy.stats import norm, rankdata
 from collections import namedtuple
