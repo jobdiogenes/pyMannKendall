@@ -5,13 +5,26 @@ Update on 28 May 2021
 version: 1.4.2
 Approach: Vectorisation
 Citation: Hussain et al., (2019). pyMannKendall: a python package for non parametric Mann Kendall family of trend tests.. Journal of Open Source Software, 4(39), 1556, https://doi.org/10.21105/joss.01556
+
+Changes by: Job Diógenes Ribeiro Borges
+- All changes are to make faster and add comment #Job
 """
+
+
+#Job: Make NumPy fast  https://superfastpython.com/numpy-blas-threading/
+# turn off threads in numpy (with openblas)
+from os import environ
+environ['OMP_NUM_THREADS'] = '1'
+from multiprocessing.pool import ThreadPool
+
+#Job: Use Numba to speed up array loop
+from numba import njit
 
 from __future__ import division
 import numpy as np
 from scipy.stats import norm, rankdata
 from collections import namedtuple
-
+from scipy.signal import correlate #Job: use FFT and are far fast then np.correlate
 
 # Supporting Functions
 # Data Preprocessing
@@ -36,31 +49,29 @@ def __preprocessing(x):
 
 	
 # Missing Values Analysis
-def __missing_values_analysis(x, method = 'skip'):
-    if method.lower() == 'skip':
-        if x.ndim == 1:
-            x = x[~np.isnan(x)]
-            
-        else:
-            x = x[~np.isnan(x).any(axis=1)]
-    
+def __missing_values_analysis(x):  #Job: remove method parameter since all call pass 'skip'
+
+    if x.ndim == 1:
+        x = x[~np.isnan(x)]
+                
     n = len(x)
     
     return x, n
 
-	
+
 # ACF Calculation
 def __acf(x, nlags):
     y = x - x.mean()
     n = len(x)
     d = n * np.ones(2 * n - 1)
     
-    acov = (np.correlate(y, y, 'full') / d)[n - 1:]
+    acov = (correlate(y, y, 'full') / d)[n - 1:]
     
     return acov[:nlags+1]/acov[0]
 
 
 # vectorization approach to calculate mk score, S
+@njit #Job: speed up with Numba
 def __mk_score(x, n):
     s = 0
 
@@ -72,6 +83,7 @@ def __mk_score(x, n):
 
 	
 # original Mann-Kendal's variance S calculation
+@njit #Job: speed up with Numba
 def __variance_s(x, n):
     # calculate the unique data
     unique_x = np.unique(x)
@@ -120,7 +132,7 @@ def __p_value(z, alpha):
     
     return p, h, trend
 
-
+@njit #Job: speed up with Numba
 def __R(x):
     n = len(x)
     R = []
@@ -132,7 +144,7 @@ def __R(x):
     
     return np.asarray(R)
 
-
+@njit #Job: speed up with Numba
 def __K(x,z):
     n = len(x)
     K = 0
@@ -145,6 +157,7 @@ def __K(x,z):
 
 	
 # Original Sens Estimator
+@njit  #Job: speed up with Numba
 def __sens_estimator(x):
     idx = 0
     n = len(x)
@@ -182,7 +195,7 @@ def sens_slope(x):
     
     return res(slope, intercept)
 
-
+@njit #Job: speed up with Numba
 def seasonal_sens_slope(x_old, period=12):
     """
     This method proposed by Hipel (1994) to estimate the magnitude of the monotonic trend, when data has seasonal effects. Intercept calculated using Conover, W.J. (1980) method.
@@ -246,7 +259,7 @@ def original_test(x_old, alpha = 0.05):
     """
     res = namedtuple('Mann_Kendall_Test', ['trend', 'h', 'p', 'z', 'Tau', 's', 'var_s', 'slope', 'intercept'])
     x, c = __preprocessing(x_old)
-    x, n = __missing_values_analysis(x, method = 'skip')
+    x, n = __missing_values_analysis(x) #Job: remove method parameter
     
     s = __mk_score(x, n)
     var_s = __variance_s(x, n)
@@ -258,6 +271,8 @@ def original_test(x_old, alpha = 0.05):
 
     return res(trend, h, p, z, Tau, s, var_s, slope, intercept)
 
+
+@njit #Job: speed up with Numba
 def hamed_rao_modification_test(x_old, alpha = 0.05, lag=None):
     """
     This function checks the Modified Mann-Kendall (MK) test using Hamed and Rao (1998) method.
@@ -284,7 +299,7 @@ def hamed_rao_modification_test(x_old, alpha = 0.05, lag=None):
     """
     res = namedtuple('Modified_Mann_Kendall_Test_Hamed_Rao_Approach', ['trend', 'h', 'p', 'z', 'Tau', 's', 'var_s', 'slope', 'intercept'])
     x, c = __preprocessing(x_old)
-    x, n = __missing_values_analysis(x, method = 'skip')
+    x, n = __missing_values_analysis(x) # #Job: remove method parameter
     
     s = __mk_score(x, n)
     var_s = __variance_s(x, n)
@@ -348,7 +363,7 @@ def yue_wang_modification_test(x_old, alpha = 0.05, lag=None):
     """
     res = namedtuple('Modified_Mann_Kendall_Test_Yue_Wang_Approach', ['trend', 'h', 'p', 'z', 'Tau', 's', 'var_s', 'slope', 'intercept'])
     x, c = __preprocessing(x_old)
-    x, n = __missing_values_analysis(x, method = 'skip')
+    x, n = __missing_values_analysis(x) #Job: remove method parameter
     
     s = __mk_score(x, n)
     var_s = __variance_s(x, n)
@@ -377,6 +392,7 @@ def yue_wang_modification_test(x_old, alpha = 0.05, lag=None):
 
     return res(trend, h, p, z, Tau, s, var_s, slope, intercept)
 
+
 def pre_whitening_modification_test(x_old, alpha = 0.05):
     """
     This function checks the Modified Mann-Kendall (MK) test using Pre-Whitening method proposed by Yue and Wang (2002).
@@ -402,7 +418,7 @@ def pre_whitening_modification_test(x_old, alpha = 0.05):
     res = namedtuple('Modified_Mann_Kendall_Test_PreWhitening_Approach', ['trend', 'h', 'p', 'z', 'Tau', 's', 'var_s', 'slope', 'intercept'])
     
     x, c = __preprocessing(x_old)
-    x, n = __missing_values_analysis(x, method = 'skip')
+    x, n = __missing_values_analysis(x) #Job: remove method parameter
     
     # PreWhitening
     acf_1 = __acf(x, nlags=1)[1]
@@ -446,7 +462,7 @@ def trend_free_pre_whitening_modification_test(x_old, alpha = 0.05):
     res = namedtuple('Modified_Mann_Kendall_Test_Trend_Free_PreWhitening_Approach', ['trend', 'h', 'p', 'z', 'Tau', 's', 'var_s', 'slope', 'intercept'])
     
     x, c = __preprocessing(x_old)
-    x, n = __missing_values_analysis(x, method = 'skip')
+    x, n = __missing_values_analysis(x) #Job: remove method parameter
     
     # detrending
     slope, intercept = sens_slope(x_old)
@@ -472,6 +488,7 @@ def trend_free_pre_whitening_modification_test(x_old, alpha = 0.05):
     return res(trend, h, p, z, Tau, s, var_s, slope, intercept)
 
 
+@njit #Job: speed up with Numba
 def multivariate_test(x_old, alpha = 0.05):
     """
     This function checks the Multivariate Mann-Kendall (MK) test, which is originally proposed by R. M. Hirsch and J. R. Slack (1984) for the seasonal Mann-Kendall test. Later this method also used Helsel (2006) for Regional Mann-Kendall test.
@@ -505,9 +522,9 @@ def multivariate_test(x_old, alpha = 0.05):
 
     for i in range(c):
         if c == 1:
-            x_new, n = __missing_values_analysis(x, method = 'skip')  # It makes all column at deferent size
+            x_new, n = __missing_values_analysis(x) #Job: remove method parameter # It makes all column at deferent size 
         else:
-            x_new, n = __missing_values_analysis(x[:,i], method = 'skip')  # It makes all column at deferent size
+            x_new, n = __missing_values_analysis(x[:,i]) #Job: remove method parameter # It makes all column at deferent size
 
         s = s + __mk_score(x_new, n)
         var_s = var_s + __variance_s(x_new, n)
@@ -592,6 +609,7 @@ def regional_test(x_old, alpha = 0.05):
     return res(trend, h, p, z, Tau, s, var_s, slope, intercept)
 
 
+@njit #Job: speed up with Numba
 def correlated_multivariate_test(x_old, alpha = 0.05):
     """
     This function checks the Correlated Multivariate Mann-Kendall (MK) test (Libiseller and Grimvall (2002)).
@@ -617,7 +635,7 @@ def correlated_multivariate_test(x_old, alpha = 0.05):
     """
     res = namedtuple('Correlated_Multivariate_Mann_Kendall_Test', ['trend', 'h', 'p', 'z', 'Tau', 's', 'var_s', 'slope', 'intercept'])
     x, c = __preprocessing(x_old)
-    x, n = __missing_values_analysis(x, method = 'skip')
+    x, n = __missing_values_analysis(x) #Job: remove method parameter
     
     s = 0
     denom = 0
@@ -720,7 +738,7 @@ def partial_test(x_old, alpha = 0.05):
     res = namedtuple('Partial_Mann_Kendall_Test', ['trend', 'h', 'p', 'z', 'Tau', 's', 'var_s', 'slope', 'intercept'])
     
     x_proc, c = __preprocessing(x_old)
-    x_proc, n = __missing_values_analysis(x_proc, method = 'skip')
+    x_proc, n = __missing_values_analysis(x_proc) #Job: remove method parameter
     
     if c != 2:
         raise ValueError('Partial Mann Kendall test required two parameters/columns. Here column no ' + str(c) + ' is not equal to 2.')
